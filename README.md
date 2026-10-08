@@ -1,3 +1,4 @@
+
 # 📈 Autonomous Data Analyst Pro
 
 An autonomous, multi-turn AI Data Analyst agent built with **Streamlit**, **Google Gemini** (via OpenAI-compatible endpoint), and **E2B Code Interpreter**. 
@@ -42,3 +43,113 @@ User Prompt + Datasets
                                    │
                                    ▼
                      Rendered in Streamlit Chat UI
+
+```
+
+---
+
+## 📋 Prerequisites
+
+* Python 3.10+
+* A **Google Gemini API Key** (from [Google AI Studio](https://aistudio.google.com/))
+* An **E2B API Key** (from [E2B.dev](https://e2b.dev/))
+
+---
+
+## 🚀 Quickstart
+
+### 1. Clone the Repository
+
+```bash
+git clone [https://github.com/](https://github.com/)<your-username>/<your-repo-name>.git
+cd <your-repo-name>
+
+```
+
+### 2. Set Up a Virtual Environment
+
+```bash
+python -m venv venv
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+
+```
+
+### 4. Configure Environment Variables
+
+Create a `.env` file in the root directory (or use Streamlit secrets):
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+E2B_API_KEY=your_e2b_api_key_here
+
+```
+
+For Streamlit Cloud deployment, add these under **Settings > Secrets**:
+
+```toml
+GEMINI_API_KEY = "your_gemini_api_key_here"
+E2B_API_KEY = "your_e2b_api_key_here"
+
+```
+
+### 5. Run the Application
+
+```bash
+streamlit run app.py
+
+```
+
+---
+
+## 📦 `requirements.txt`
+
+```text
+streamlit
+openai
+e2b-code-interpreter
+pandas
+matplotlib
+plotly
+
+```
+
+---
+
+## 💡 Example Prompts to Try
+
+1. **Trend & Time-Series Analysis:**
+> *"Group total weekly sales by month and plot an interactive line chart showing seasonality."*
+
+
+2. **Categorical Comparisons:**
+> *"Compare average sales during holiday weeks vs non-holiday weeks in a bar chart."*
+
+
+3. **Data Cleaning & Export:**
+> *"Find and remove all rows with missing values in the dataset, calculate the new summary statistics, and provide a download link for the cleaned dataset."*
+
+
+4. **Multi-Dataset Joins:**
+> *"Merge the uploaded orders and customers files on customer ID, then show top 5 cities by total spend."*
+
+
+
+---
+
+## 🛡️ License
+
+This project is licensed under the MIT License.
+
+```
+
+```
