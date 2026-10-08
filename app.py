@@ -45,7 +45,8 @@ with st.sidebar:
     st.divider()
     
     st.markdown("### Upload Dataset")
-    uploaded_file = st.file_uploader("Upload your CSV file here", type=["csv"], help="Maximum file size is 200MB.")
+    # UPDATED: Now accepts both CSV and ZIP files
+    uploaded_file = st.file_uploader("Upload your CSV or ZIP file here", type=["csv", "zip"], help="Maximum file size is 200MB.")
 
 # --- MAIN DASHBOARD INTERFACE ---
 st.markdown('<p class="main-header">📈 Autonomous Data Analyst Agent</p>', unsafe_allow_html=True)
@@ -62,11 +63,10 @@ if st.button("🚀 Run Analysis", type="primary"):
     if not GEMINI_API_KEY or not E2B_API_KEY:
         st.error("Cannot run: Missing API Keys. Please check your Streamlit Secrets.")
     elif not uploaded_file:
-        st.warning("Please upload a CSV dataset from the sidebar first.")
+        st.warning("Please upload a dataset from the sidebar first.")
     elif not query.strip():
         st.warning("Please enter a question for the AI.")
     else:
-        # Step-by-step progress UI
         with st.status("Initializing AI Agent...", expanded=True) as status:
             file_bytes = uploaded_file.getvalue()
             filename = uploaded_file.name
@@ -79,19 +79,43 @@ if st.button("🚀 Run Analysis", type="primary"):
                     sandbox.files.write(filename, file_bytes)
                     
                     st.write("🔍 Inspecting dataset schema...")
-                    inspect_script = f"""
+                    
+                    # UPDATED: Logic to handle ZIP files vs standard CSV files
+                    if filename.endswith(".zip"):
+                        st.write("📦 Extracting ZIP archive...")
+                        inspect_script = f"""
+import zipfile, os, glob
 import pandas as pd
-df = pd.read_csv('{filename}')
+
+with zipfile.ZipFile('{filename}', 'r') as zip_ref:
+    zip_ref.extractall('extracted_data')
+
+csv_files = glob.glob('extracted_data/**/*.csv', recursive=True)
+if not csv_files:
+    raise FileNotFoundError("No CSV file found inside the uploaded ZIP archive.")
+
+target_csv = csv_files[0]
+df = pd.read_csv(target_csv)
+print("ACTIVE_FILE:", target_csv)
 print("COLUMNS:", list(df.columns))
 print("TYPES:\\n", df.dtypes.to_dict())
 """
+                    else:
+                        inspect_script = f"""
+import pandas as pd
+df = pd.read_csv('{filename}')
+print("ACTIVE_FILE:", '{filename}')
+print("COLUMNS:", list(df.columns))
+print("TYPES:\\n", df.dtypes.to_dict())
+"""
+
                     schema_info = sandbox.run_code(inspect_script).text
 
                     tools = [{
                         "type": "function",
                         "function": {
                             "name": "run_python",
-                            "description": "Executes Python code. The CSV is saved locally. ALWAYS save charts as 'chart.png' via plt.savefig('chart.png').",
+                            "description": "Executes Python code. ALWAYS save charts as 'chart.png' via plt.savefig('chart.png').",
                             "parameters": {
                                 "type": "object",
                                 "properties": {"code": {"type": "string"}},
@@ -100,14 +124,15 @@ print("TYPES:\\n", df.dtypes.to_dict())
                         }
                     }]
 
+                    # UPDATED: The prompt now tells the AI to read the ACTIVE_FILE path printed by our script
                     messages = [
-                        {"role": "system", "content": "You are a Senior Data Analyst. Write python code using pandas and matplotlib to analyze data. ALWAYS use the run_python tool to execute it. Always save charts as 'chart.png'."},
-                        {"role": "user", "content": f"Dataset: {filename}\nSchema:\n{schema_info}\nTask: {query}"}
+                        {"role": "system", "content": "You are a Senior Data Analyst. Write python code using pandas and matplotlib to analyze data. ALWAYS use the run_python tool to execute it. Always save charts as 'chart.png'. Ensure you load the correct CSV path indicated by ACTIVE_FILE."},
+                        {"role": "user", "content": f"Schema Info:\n{schema_info}\nTask: {query}"}
                     ]
 
                     st.write("🧠 AI is planning the analysis...")
                     response = client.chat.completions.create(
-                        model="gemini-2.5-flash", # <--- Fixed 404: Updated to Google's active model
+                        model="gemini-2.5-flash", 
                         messages=messages, 
                         tools=tools, 
                         tool_choice="auto"
@@ -134,14 +159,13 @@ print("TYPES:\\n", df.dtypes.to_dict())
                         
                         st.write("📝 Synthesizing final insights...")
                         final_response = client.chat.completions.create(
-                            model="gemini-2.5-flash", # <--- Fixed 404: Updated to Google's active model
+                            model="gemini-2.5-flash", 
                             messages=messages
                         )
                         summary = final_response.choices[0].message.content
                     else:
                         summary = msg.content
                     
-                    # Fetch chart if created
                     chart_base64 = None
                     try:
                         chart_bytes = sandbox.files.read("chart.png", format="bytes")
