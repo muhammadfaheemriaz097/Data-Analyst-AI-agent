@@ -144,4 +144,75 @@ print("TYPES:\\n", df.dtypes.to_dict())
                         "content": msg.content or "" 
                     }
                     
-                    executed_
+                    executed_code = None
+                    
+                    if msg.tool_calls:
+                        assistant_message["tool_calls"] = [
+                            {
+                                "id": t.id,
+                                "type": t.type,
+                                "function": {"name": t.function.name, "arguments": t.function.arguments}
+                            } for t in msg.tool_calls
+                        ]
+                        messages.append(assistant_message)
+                        
+                        st.write("💻 Executing AI-generated Python code...")
+                        for tool_call in msg.tool_calls:
+                            executed_code = json.loads(tool_call.function.arguments)["code"]
+                            execution = sandbox.run_code(executed_code)
+                            
+                            output = execution.text if not execution.error else f"Error: {execution.error.value}"
+                            
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": output or "Success" 
+                            })
+                        
+                        st.write("📝 Synthesizing final insights...")
+                        final_response = client.chat.completions.create(
+                            model="gemini-2.5-flash", 
+                            messages=messages
+                        )
+                        summary = final_response.choices[0].message.content or "No summary generated. Please review the Execution Logs tab."
+                    else:
+                        messages.append(assistant_message)
+                        summary = msg.content or "No summary generated. Please review the Execution Logs tab."
+                    
+                    chart_base64 = None
+                    try:
+                        chart_bytes = sandbox.files.read("chart.png", format="bytes")
+                        if chart_bytes:
+                            chart_base64 = base64.b64encode(chart_bytes).decode("utf-8")
+                    except Exception:
+                        pass
+                
+                status.update(label="Analysis Complete!", state="complete", expanded=False)
+                
+            except Exception as e:
+                status.update(label="An error occurred", state="error", expanded=True)
+                st.error(f"Error details: {str(e)}")
+                st.stop()
+
+        # --- BEAUTIFUL RESULTS RENDERING (TABS) ---
+        st.divider()
+        st.markdown('<p class="main-header" style="font-size: 2rem;">Analysis Results</p>', unsafe_allow_html=True)
+        
+        tab1, tab2, tab3 = st.tabs(["📊 Executive Summary", "📈 Visualization", "💻 Execution Logs"])
+        
+        with tab1:
+            st.markdown(summary)
+            
+        with tab2:
+            if chart_base64:
+                image_data = base64.b64decode(chart_base64)
+                st.image(image_data, use_container_width=True, caption="AI-Generated Visualization")
+            else:
+                st.info("No visualization was generated for this specific query. Try asking the AI to 'plot' or 'chart' the data.")
+                
+        with tab3:
+            if executed_code:
+                st.markdown("### Python Code Written by AI")
+                st.code(executed_code, language="python")
+            else:
+                st.info("The AI answered the question directly without needing to execute Python code.")
