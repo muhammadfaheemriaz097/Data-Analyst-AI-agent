@@ -14,7 +14,6 @@ st.markdown("""
     .main-header { font-size: 2.5rem; font-weight: 700; margin-bottom: 0px; }
     .sub-header { font-size: 1.1rem; color: #6B7280; margin-bottom: 30px; }
     .stButton>button { width: 100%; border-radius: 8px; font-weight: 600; height: 3rem; }
-    .success-text { color: #10B981; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -108,7 +107,7 @@ print("TYPES:\\n", df.dtypes.to_dict())
 
                     st.write("🧠 AI is planning the analysis...")
                     response = client.chat.completions.create(
-                        model="gemini-1.5-flash-latest", # <--- Fixed 404 Bug
+                        model="gemini-1.5-flash-latest", 
                         messages=messages, 
                         tools=tools, 
                         tool_choice="auto"
@@ -134,4 +133,49 @@ print("TYPES:\\n", df.dtypes.to_dict())
                             })
                         
                         st.write("📝 Synthesizing final insights...")
-                        final_response = client.chat.com
+                        final_response = client.chat.completions.create(
+                            model="gemini-1.5-flash-latest", 
+                            messages=messages
+                        )
+                        summary = final_response.choices[0].message.content
+                    else:
+                        summary = msg.content
+                    
+                    # Fetch chart if created
+                    chart_base64 = None
+                    try:
+                        chart_bytes = sandbox.files.read("chart.png", format="bytes")
+                        if chart_bytes:
+                            chart_base64 = base64.b64encode(chart_bytes).decode("utf-8")
+                    except Exception:
+                        pass
+                
+                status.update(label="Analysis Complete!", state="complete", expanded=False)
+                
+            except Exception as e:
+                status.update(label="An error occurred", state="error", expanded=True)
+                st.error(f"Error details: {str(e)}")
+                st.stop()
+
+        # --- BEAUTIFUL RESULTS RENDERING (TABS) ---
+        st.divider()
+        st.markdown('<p class="main-header" style="font-size: 2rem;">Analysis Results</p>', unsafe_allow_html=True)
+        
+        tab1, tab2, tab3 = st.tabs(["📊 Executive Summary", "📈 Visualization", "💻 Execution Logs"])
+        
+        with tab1:
+            st.markdown(summary)
+            
+        with tab2:
+            if chart_base64:
+                image_data = base64.b64decode(chart_base64)
+                st.image(image_data, use_container_width=True, caption="AI-Generated Visualization")
+            else:
+                st.info("No visualization was generated for this specific query. Try asking the AI to 'plot' or 'chart' the data.")
+                
+        with tab3:
+            if executed_code:
+                st.markdown("### Python Code Written by AI")
+                st.code(executed_code, language="python")
+            else:
+                st.info("The AI answered the question directly without needing to execute Python code.")
