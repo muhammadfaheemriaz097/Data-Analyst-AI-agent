@@ -45,7 +45,6 @@ with st.sidebar:
     st.divider()
     
     st.markdown("### Upload Dataset")
-    # UPDATED: Now accepts both CSV and ZIP files
     uploaded_file = st.file_uploader("Upload your CSV or ZIP file here", type=["csv", "zip"], help="Maximum file size is 200MB.")
 
 # --- MAIN DASHBOARD INTERFACE ---
@@ -80,7 +79,6 @@ if st.button("🚀 Run Analysis", type="primary"):
                     
                     st.write("🔍 Inspecting dataset schema...")
                     
-                    # UPDATED: Logic to handle ZIP files vs standard CSV files
                     if filename.endswith(".zip"):
                         st.write("📦 Extracting ZIP archive...")
                         inspect_script = f"""
@@ -124,7 +122,6 @@ print("TYPES:\\n", df.dtypes.to_dict())
                         }
                     }]
 
-                    # UPDATED: The prompt now tells the AI to read the ACTIVE_FILE path printed by our script
                     messages = [
                         {"role": "system", "content": "You are a Senior Data Analyst. Write python code using pandas and matplotlib to analyze data. ALWAYS use the run_python tool to execute it. Always save charts as 'chart.png'. Ensure you load the correct CSV path indicated by ACTIVE_FILE."},
                         {"role": "user", "content": f"Schema Info:\n{schema_info}\nTask: {query}"}
@@ -139,11 +136,25 @@ print("TYPES:\\n", df.dtypes.to_dict())
                     )
                     
                     msg = response.choices[0].message
-                    messages.append(msg)
+                    
+                    # FIX: Safely parse the assistant message to prevent 'None' crashes
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": msg.content or "" # Converts 'None' to an empty string
+                    }
                     
                     executed_code = None
                     
                     if msg.tool_calls:
+                        assistant_message["tool_calls"] = [
+                            {
+                                "id": t.id,
+                                "type": t.type,
+                                "function": {"name": t.function.name, "arguments": t.function.arguments}
+                            } for t in msg.tool_calls
+                        ]
+                        messages.append(assistant_message)
+                        
                         st.write("💻 Executing AI-generated Python code...")
                         for tool_call in msg.tool_calls:
                             executed_code = json.loads(tool_call.function.arguments)["code"]
@@ -154,7 +165,7 @@ print("TYPES:\\n", df.dtypes.to_dict())
                             messages.append({
                                 "role": "tool",
                                 "tool_call_id": tool_call.id,
-                                "content": output
+                                "content": output or "Success" # Prevent empty tool returns
                             })
                         
                         st.write("📝 Synthesizing final insights...")
@@ -162,9 +173,10 @@ print("TYPES:\\n", df.dtypes.to_dict())
                             model="gemini-2.5-flash", 
                             messages=messages
                         )
-                        summary = final_response.choices[0].message.content
+                        summary = final_response.choices[0].message.content or "No summary generated. Please review the Execution Logs tab."
                     else:
-                        summary = msg.content
+                        messages.append(assistant_message)
+                        summary = msg.content or "No summary generated. Please review the Execution Logs tab."
                     
                     chart_base64 = None
                     try:
