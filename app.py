@@ -107,7 +107,7 @@ print("TYPES:\\n", df.dtypes.to_dict())
 
                     st.write("🧠 AI is planning the analysis...")
                     response = client.chat.completions.create(
-                        model="gemini-1.5-flash-latest", 
+                        model="gemini-2.5-flash", # <--- Fixed 404: Updated to Google's active model
                         messages=messages, 
                         tools=tools, 
                         tool_choice="auto"
@@ -134,7 +134,7 @@ print("TYPES:\\n", df.dtypes.to_dict())
                         
                         st.write("📝 Synthesizing final insights...")
                         final_response = client.chat.completions.create(
-                            model="gemini-1.5-flash-latest", 
+                            model="gemini-2.5-flash", # <--- Fixed 404: Updated to Google's active model
                             messages=messages
                         )
                         summary = final_response.choices[0].message.content
